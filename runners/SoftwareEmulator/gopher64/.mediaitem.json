@@ -1,0 +1,22 @@
+{
+  "_itemType": "SoftwareEmulator",
+  "_parentItemType": {
+    "title": "SoftwareApplication",
+    "schemaVersion": "1.0"
+  },
+  "_itemTitle": "Gopher64 · gopher64",
+  "title": "Gopher64",
+  "description": "\"A cross-platform N64 emulator.\" Features netplay, homebrew support, upscaling, CRT shaders, CPU overclocking emulation, cheats, savestates, and RetroAchievements integration.\n\nBy loganmc10, who also wrote simple64, which this supersedes. Portions adapted from mupen64plus and ares.",
+  "publisher": "gopher64",
+  "developer": "loganmc10",
+  "homepage": "https://github.com/gopher64/gopher64",
+  "license": "GPL-3.0",
+  "emulates": [
+    "N64CartRom"
+  ],
+  "achievements": {
+    "provider": "RetroAchievements",
+    "hardcore": false,
+    "note": "RetroAchievements has not granted Gopher64 hardcore verification, because it has no in-game achievements browser: its GUI is a launcher and does not stay connected to the game window, so the game cannot report achievement data back. Unlocks earned in hardcore are converted to softcore when the server processes them."
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "uninstallSteps": [
+    {
+      "step": "deletePath",
+      "path": "install"
+    }
+  ],
+  "builds": [
+    {
+      "targetPlatforms": {
+        "Linux-x64": {
+          "asset": "gopher64-linux-x86_64",
+          "exe": "gopher64"
+        },
+        "Linux-arm64": {
+          "asset": "gopher64-linux-aarch64",
+          "exe": "gopher64"
+        },
+        "Windows-x64": {
+          "asset": "gopher64-windows-x86_64.exe",
+          "exe": "gopher64.exe"
+        },
+        "Windows-arm64": {
+          "asset": "gopher64-windows-aarch64.exe",
+          "exe": "gopher64.exe"
+        }
+      },
+      "args": {
+        "tag": {
+          "type": "string",
+          "label": "Release tag, resolved from the release feed at install time"
+        }
+      },
+      "dependencies": [],
+      "steps": [
+        {
+          "step": "createDir",
+          "path": "install"
+        },
+        {
+          "step": "fetch",
+          "url": "https://github.com/gopher64/gopher64/releases/download/${args.tag}/${platform.asset}",
+          "dest": "install/${platform.exe}"
+        },
+        {
+          "step": "defineExecutable",
+          "executable": "install/${platform.exe}",
+          "title": "Play",
+          "args": [
+            "${romPath}"
+          ]
+        }
+      ]
+    },
+    {
+      "targetPlatforms": {
+        "Mac-arm64": {
+          "asset": "gopher64-macos-aarch64.zip"
+        }
+      },
+      "args": {
+        "tag": {
+          "type": "string",
+          "label": "Release tag, resolved from the release feed at install time"
+        }
+      },
+      "dependencies": [],
+      "steps": [
+        {
+          "step": "createDir",
+          "path": ".build"
+        },
+        {
+          "step": "fetch",
+          "url": "https://github.com/gopher64/gopher64/releases/download/${args.tag}/${platform.asset}",
+          "dest": ".build/${platform.asset}"
+        },
+        {
+          "step": "extract",
+          "src": ".build/${platform.asset}",
+          "dest": "install"
+        },
+        {
+          "step": "deletePath",
+          "path": ".build"
+        },
+        {
+          "step": "defineExecutable",
+          "executable": "install/gopher64",
+          "title": "Play",
+          "args": [
+            "${romPath}"
+          ]
+        }
+      ]
+    }
+  ]
+}

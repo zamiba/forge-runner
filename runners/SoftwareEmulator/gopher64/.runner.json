@@ -1,0 +1,9 @@
+{
+  "runs": [
+    "N64CartRom"
+  ],
+  "releaseSource": {
+    "host": "github",
+    "repo": "gopher64/gopher64"
+  }
+}
