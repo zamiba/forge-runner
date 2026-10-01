@@ -5,5 +5,13 @@
   "releaseSource": {
     "host": "github",
     "repo": "gopher64/gopher64"
+  },
+  "dependencies": {
+    "Linux": {
+      "libraries": [
+        "libfontconfig.so.1"
+      ],
+      "hint": "fontconfig — Debian/Ubuntu: libfontconfig1 · Arch: fontconfig · Fedora: fontconfig. Most desktop installs already have it."
+    }
   }
 }

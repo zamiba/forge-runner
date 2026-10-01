@@ -70,6 +70,47 @@ forge-runner install "Gopher64 · gopher64"
 forge-runner launch  "Gopher64 · gopher64" /games/zelda.z64
 ```
 
+## System dependencies: two checks, because one cannot do it
+
+`.runner.json` declares what must already be on the machine:
+
+```json
+"dependencies": {
+  "Linux": {
+    "libraries": ["libfontconfig.so.1"],
+    "hint": "fontconfig — Debian/Ubuntu: libfontconfig1 · Arch: fontconfig · Fedora: fontconfig"
+  }
+}
+```
+
+This is not forge's `dependencies`, which is a PATH check for commands and
+doubles as its `run` allowlist. A shared library is neither a command nor
+something a build invokes, so forge cannot express it.
+
+**Declare what somebody might plausibly lack, not everything the binary links.**
+`libc`, `libm`, `libstdc++` and `libgcc_s` are on every glibc desktop; declaring
+them adds noise and invents failures on a musl system where there is no
+`libc.so.6` to find and the program may still run. What a declaration uniquely
+buys is a warning *before* a 70MB download, and `hint` — because a soname is not
+installable and the package name differs per distribution, which no amount of
+inspecting the binary will reveal.
+
+`MissingLibraries` answers from the declaration and needs nothing installed.
+`VerifyLinked` asks the dynamic loader about an installed binary, and catches
+what a declaration cannot express at all:
+
+```
+GLIBCXX_3.4.31 is older than this build needs
+GLIBC_2.38 is older than this build needs
+libfontconfig.so.1 is missing
+```
+
+Those first two are the failure that actually bites: the library is **present**
+and too old, a name search says everything is fine, and the program still will
+not start. Only the loader knows, because only the loader checks symbol
+versions. A missing library is therefore a warning beside a working Install
+button and not a disabled one — the download and unpacking succeed either way.
+
 ## Two traps worth knowing
 
 **`go:embed` cannot carry an `_itemTitle`.** Embedded paths go through

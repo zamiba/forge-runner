@@ -112,6 +112,11 @@ type RunnerSpec struct {
 	// system upstream calls experimental.
 	Runs []string `json:"runs,omitempty"`
 
+	// Dependencies are what must already be on the machine, which forge cannot
+	// express: its own `dependencies` is a PATH check for commands and doubles
+	// as its `run` allowlist, and a shared library is neither.
+	Dependencies Dependencies `json:"dependencies,omitempty"`
+
 	// ReleaseSource says where to look for the newest release, because forge's
 	// fetch step takes a literal URL and has no notion of "latest". A spec
 	// shipped inside a binary cannot hardcode one: that would make an emulator

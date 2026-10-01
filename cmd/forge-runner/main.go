@@ -117,11 +117,17 @@ func list(store runner.Store, platform string) error {
 		if a := r.Item.Achievements; a != nil && !a.Hardcore {
 			marks = append(marks, a.Provider+" softcore only")
 		}
+		if missing := runner.MissingLibraries(r.Spec.Dependencies.For(platform).Libraries); len(missing) > 0 {
+			marks = append(marks, "needs "+strings.Join(missing, ", "))
+		}
 		note := ""
 		if len(marks) > 0 {
 			note = "  (" + strings.Join(marks, "; ") + ")"
 		}
 		fmt.Printf("%-28s runs %s%s\n", r.Item.ItemTitle, strings.Join(r.Spec.Runs, ", "), note)
+		if hint := r.Spec.Dependencies.For(platform).Hint; hint != "" && len(marks) > 0 {
+			fmt.Printf("%-28s %s\n", "", hint)
+		}
 	}
 	return nil
 }
@@ -188,6 +194,21 @@ func launch(r runner.Runner, store runner.Store, root, platform, file string) er
 	}
 	if _, err := os.Stat(exePath); err != nil {
 		return fmt.Errorf("%s is not installed: %w", r.Item.Title, err)
+	}
+
+	// Asked before starting anything. ldd is the loader, so it is the only thing
+	// that can see a library present but older than the build needs — the
+	// failure that bites on an older distribution and that a declared list of
+	// names cannot express.
+	if problems := runner.VerifyLinked(exePath); len(problems) > 0 {
+		fmt.Fprintf(os.Stderr, "%s cannot start on this system:\n", r.Item.Title)
+		for _, p := range problems {
+			fmt.Fprintln(os.Stderr, "  "+p)
+		}
+		if hint := r.Spec.Dependencies.For(platform).Hint; hint != "" {
+			fmt.Fprintln(os.Stderr, "  "+hint)
+		}
+		return fmt.Errorf("missing or outdated system libraries")
 	}
 
 	args, err := runner.LaunchArgs(exe, runner.LaunchOptions{MediaPath: abs})

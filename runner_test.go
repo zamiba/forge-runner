@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -485,5 +487,118 @@ func TestUnsupportedNamesTheHostAndWhatExists(t *testing.T) {
 	}
 	if !strings.Contains(msg, "Mac-arm64") {
 		t.Errorf("error is %q; it must list what is published, which includes a Mac build", msg)
+	}
+}
+
+// The declared dependencies are the pre-install warning, so what they must not
+// be is an exhaustive dump of the binary's DT_NEEDED list: libc and libstdc++
+// are on every glibc desktop, and declaring them invents failures on a musl
+// system where there is no libc.so.6 to find and the program may still run.
+func TestDeclaredDependenciesAreWorthWarningAbout(t *testing.T) {
+	s := materialise(t)
+	runners, err := s.List()
+	if err != nil || len(runners) == 0 {
+		t.Fatal(err)
+	}
+
+	// The ones every glibc desktop has. Declaring one is the mistake this
+	// catches, because it would nag everybody about a library they have.
+	universal := map[string]bool{
+		"libc.so.6": true, "libm.so.6": true, "libstdc++.so.6": true,
+		"libgcc_s.so.1": true, "libdl.so.2": true, "libpthread.so.0": true,
+		"ld-linux-x86-64.so.2": true,
+	}
+
+	for _, r := range runners {
+		for osName, dep := range r.Spec.Dependencies {
+			if osName != "Linux" && osName != "Windows" && osName != "Mac" {
+				t.Errorf("%s: dependencies keyed by %q; it is an OS name, not a platform", r.Item.ItemTitle, osName)
+			}
+			for _, lib := range dep.Libraries {
+				if universal[lib] {
+					t.Errorf("%s declares %s, which every glibc desktop has; declare what somebody might lack", r.Item.ItemTitle, lib)
+				}
+				// A soname, as the loader looks for it — not a package name.
+				if !strings.Contains(lib, ".so") {
+					t.Errorf("%s declares %q, which is not a soname", r.Item.ItemTitle, lib)
+				}
+			}
+			// A soname is not installable, so a declaration without a hint tells
+			// somebody they are missing something and not how to get it.
+			if len(dep.Libraries) > 0 && dep.Hint == "" {
+				t.Errorf("%s declares libraries for %s with no hint; a soname is not a package name", r.Item.ItemTitle, osName)
+			}
+		}
+	}
+}
+
+// For accepts an OS name or a full platform name, because callers have one or
+// the other depending on how far through an install they are.
+func TestDependenciesForAcceptsEitherName(t *testing.T) {
+	d := Dependencies{"Linux": {Libraries: []string{"libfoo.so.1"}, Hint: "foo"}}
+	for _, name := range []string{"Linux", "Linux-x64", "Linux-arm64"} {
+		if got := d.For(name); len(got.Libraries) != 1 {
+			t.Errorf("For(%q) = %+v, want the Linux entry", name, got)
+		}
+	}
+	if got := d.For("Mac-arm64"); len(got.Libraries) != 0 {
+		t.Errorf("For(Mac-arm64) = %+v, want nothing", got)
+	}
+}
+
+// MissingLibraries is a name search, so it must find what is plainly there and
+// must not claim something absent is present.
+func TestMissingLibrariesFindsWhatIsThere(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("library searching only applies on Linux")
+	}
+	// libc is present on any machine running this test.
+	if got := MissingLibraries([]string{"libc.so.6"}); len(got) != 0 {
+		t.Errorf("MissingLibraries(libc.so.6) = %v; it is on this machine", got)
+	}
+	if got := MissingLibraries([]string{"libdefinitelynotreal.so.99"}); len(got) != 1 {
+		t.Errorf("MissingLibraries(nonsense) = %v, want one entry", got)
+	}
+	// Order is the declared order, so a message reads the way it was written.
+	got := MissingLibraries([]string{"libnope1.so.1", "libc.so.6", "libnope2.so.2"})
+	if len(got) != 2 || got[0] != "libnope1.so.1" || got[1] != "libnope2.so.2" {
+		t.Errorf("MissingLibraries = %v, want the two absent ones in order", got)
+	}
+	if got := MissingLibraries(nil); got != nil {
+		t.Errorf("MissingLibraries(nil) = %v", got)
+	}
+}
+
+// VerifyLinked must report nothing for a program that can start, because a false
+// complaint would block a launch that would have worked.
+func TestVerifyLinkedPassesSomethingThatRuns(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("ldd only applies on Linux")
+	}
+	if _, err := exec.LookPath("ldd"); err != nil {
+		t.Skip("no ldd on this machine")
+	}
+	// The test binary itself links successfully, by construction: it is running.
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := VerifyLinked(self); len(got) != 0 {
+		t.Errorf("VerifyLinked(self) = %v; this binary is running, so it links", got)
+	}
+}
+
+// And nothing for a path that is not a program, rather than a confusing
+// complaint: a check that cannot run must not invent a failure.
+func TestVerifyLinkedInventsNothingForANonProgram(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("ldd only applies on Linux")
+	}
+	f := filepath.Join(t.TempDir(), "notabinary")
+	if err := os.WriteFile(f, []byte("hello"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if got := VerifyLinked(f); len(got) != 0 {
+		t.Errorf("VerifyLinked(a text file) = %v, want nothing", got)
 	}
 }
